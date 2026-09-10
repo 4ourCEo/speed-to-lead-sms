@@ -1,0 +1,21 @@
+services:
+  - type: web
+    name: hvac-sms-intake
+    env: python
+    region: oregon
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: TWILIO_ACCOUNT_SID
+        sync: false
+      - key: TWILIO_AUTH_TOKEN
+        sync: false
+      - key: PYTHONPATH
+        value: /opt/render/project/src
+
+databases:
+  - name: hvac-intake-db
+    databaseName: hvac_intake
+    user: hvac_user
