@@ -141,7 +141,25 @@ cp .env.example .env
 DATABASE_URL=sqlite:///./hvac_intake.db
 TWILIO_ACCOUNT_SID=your_account_sid_here
 TWILIO_AUTH_TOKEN=your_auth_token_here
+
+# Startup Shop Configuration (for production/ephemeral deployments)
+SHOP_NAME=Speed-to-Lead Demo
+TWILIO_TRACKING_NUMBER=+13092478859
+SHOP_OWNER_CELL=+15555550199
+BOOKING_CALENDAR_LINK=https://cal.com/demo
 ```
+
+**Startup Shop Upsert (Production):**
+
+On platforms with ephemeral filesystems (e.g., Render free tier), the SQLite database resets on every deploy. To ensure your production tracking number works immediately, set `TWILIO_TRACKING_NUMBER` in your environment variables.
+
+The app will automatically create or update a Shop at startup with:
+- `SHOP_NAME` (default: "Speed-to-Lead Demo")
+- `TWILIO_TRACKING_NUMBER` (required; E.164 format)
+- `SHOP_OWNER_CELL` (default: same as tracking number)
+- `BOOKING_CALENDAR_LINK` (default: https://cal.com/demo)
+
+If `TWILIO_TRACKING_NUMBER` is not set, the startup upsert is skipped (useful for local dev).
 
 ### 3. Seed Database
 

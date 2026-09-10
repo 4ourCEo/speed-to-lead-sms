@@ -1,9 +1,16 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.database import engine, Base
+from app.database import engine, Base, SessionLocal
 from app.routers import voice_webhook, sms_webhook
+from app.startup import upsert_shop_from_env
 
 Base.metadata.create_all(bind=engine)
+
+db = SessionLocal()
+try:
+    upsert_shop_from_env(db)
+finally:
+    db.close()
 
 app = FastAPI(
     title="HVAC Speed-to-Lead SMS Intake Engine",
