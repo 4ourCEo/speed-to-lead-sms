@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base, SessionLocal
-from app.routers import voice_webhook, sms_webhook
+from app.routers import voice_webhook, sms_webhook, callrail_webhook
 from app.startup import upsert_shop_from_env
 
 Base.metadata.create_all(bind=engine)
@@ -14,7 +14,7 @@ finally:
 
 app = FastAPI(
     title="HVAC Speed-to-Lead SMS Intake Engine",
-    description="Twilio-powered missed call intake system",
+    description="Twilio and CallRail powered missed call intake system",
     version="1.0.0"
 )
 
@@ -28,6 +28,7 @@ app.add_middleware(
 
 app.include_router(voice_webhook.router)
 app.include_router(sms_webhook.router)
+app.include_router(callrail_webhook.router)
 
 
 @app.get("/")
@@ -37,7 +38,9 @@ async def root():
         "status": "running",
         "endpoints": {
             "voice_webhook": "/webhooks/twilio/voice",
-            "sms_webhook": "/webhooks/twilio/sms"
+            "sms_webhook": "/webhooks/twilio/sms",
+            "callrail_call_webhook": "/webhooks/callrail/call",
+            "callrail_sms_webhook": "/webhooks/callrail/sms"
         }
     }
 

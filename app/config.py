@@ -1,14 +1,22 @@
 from pydantic_settings import BaseSettings
-from typing import Optional
+from typing import Optional, Literal
 
 
 class Settings(BaseSettings):
     # Database
     database_url: str = "sqlite:///./hvac_intake.db"
     
+    # SMS Provider Selection
+    sms_provider: Literal["twilio", "callrail"] = "twilio"
+    
     # Twilio
     twilio_account_sid: Optional[str] = None
     twilio_auth_token: Optional[str] = None
+    
+    # CallRail
+    callrail_api_key: Optional[str] = None
+    callrail_account_id: Optional[str] = None
+    callrail_company_id: Optional[str] = None
     
     # Startup Shop Configuration (for ephemeral/production deployments)
     shop_name: str = "Speed-to-Lead Demo"

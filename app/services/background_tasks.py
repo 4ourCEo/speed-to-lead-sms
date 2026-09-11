@@ -2,7 +2,7 @@ import asyncio
 from datetime import datetime
 from sqlalchemy.orm import Session
 from app.models import Shop, Lead, MessageLog, LeadStatus, MessageDirection
-from app.services.twilio_service import send_sms
+from app.services.sms_sender import send_sms
 
 
 async def send_initial_sms_after_delay(

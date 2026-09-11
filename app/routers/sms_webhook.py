@@ -11,7 +11,7 @@ from app.services.intake_logic import (
     is_emergency_keyword,
     is_quiet_hours
 )
-from app.services.twilio_service import send_sms
+from app.services.sms_sender import send_sms
 
 router = APIRouter(prefix="/webhooks/twilio", tags=["twilio"])
 
