@@ -213,16 +213,27 @@ The app uses SQLAlchemy and auto-creates tables at startup (`Base.metadata.creat
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `DATABASE_URL` | Yes | `sqlite:///./hvac_intake.db` | PostgreSQL connection string |
-| `TWILIO_ACCOUNT_SID` | Yes | - | From Twilio console |
-| `TWILIO_AUTH_TOKEN` | Yes | - | From Twilio console |
+| `DATABASE_URL` | Yes | `sqlite:///./hvac_intake.db` | PostgreSQL connection string (production) |
+| `SMS_PROVIDER` | No | `twilio` | SMS provider: `twilio` or `callrail` |
+| **Twilio Credentials** | | | **Required if SMS_PROVIDER=twilio** |
+| `TWILIO_ACCOUNT_SID` | Conditional | - | From Twilio console |
+| `TWILIO_AUTH_TOKEN` | Conditional | - | From Twilio console |
 | `TWILIO_TRACKING_NUMBER` | Recommended | - | Shop tracking number (E.164) |
+| **CallRail Credentials** | | | **Required if SMS_PROVIDER=callrail** |
+| `CALLRAIL_API_KEY` | Conditional | - | From CallRail Settings → API |
+| `CALLRAIL_ACCOUNT_ID` | Conditional | - | From CallRail dashboard URL |
+| `CALLRAIL_COMPANY_ID` | Conditional | - | From CallRail dashboard URL |
+| **Shop Configuration** | | | |
 | `SHOP_NAME` | No | "Speed-to-Lead Demo" | Business name |
-| `SHOP_OWNER_CELL` | No | Same as tracking | Owner emergency contact |
+| `SHOP_OWNER_CELL` | No | Same as tracking | Owner emergency contact (E.164) |
 | `BOOKING_CALENDAR_LINK` | No | https://cal.com/demo | Booking URL |
+| **Server Settings** | | | |
 | `PYTHONPATH` | Platform-specific | - | Set to `/opt/render/project/src` on Render |
 | `HOST` | No | 0.0.0.0 | Server bind address |
 | `PORT` | No | 8000 | Server port (overridden by platform) |
+| `DEBUG` | No | false | Debug mode flag |
+
+**Note:** For CallRail webhook configuration (URL setup, event selection), see the CallRail Configuration section in the main [README.md](README.md#callrail-configuration).
 
 ## Troubleshooting
 

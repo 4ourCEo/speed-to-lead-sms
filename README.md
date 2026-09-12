@@ -55,45 +55,47 @@ Customer calls → Missed → SMS sent automatically → Customer replies
 ## Architecture
 
 ```
-┌──────────────┐           ┌───────────────┐
-│   Customer   │──Call────▶│  Twilio       │
-│   Phone      │           │  Tracking #   │
-└──────────────┘           └───────┬───────┘
-                                   │ Missed Call
-                                   ▼
-                          ┌────────────────┐
-                          │  Voice Webhook │
-                          │  (FastAPI)     │
-                          └────────┬───────┘
-                                   │ Create Lead
-                                   ▼
-                          ┌────────────────┐
-                          │  Background    │
-                          │  Task (5-15s)  │
-                          └────────┬───────┘
-                                   │ Send SMS
-                                   ▼
-┌──────────────┐           ┌───────────────┐
-│  Customer    │◀──SMS─────│  SMS Webhook  │
-│  Replies     │           │  (FastAPI)    │
-└──────┬───────┘           └───────────────┘
-       │                          │
-       │ "basement flooded"       │ Emergency?
-       └─────────────────────────▶│ ──Yes──▶ Alert Owner
-                                  │
-                                  │ ──No───▶ Next Step
-                                  ▼
-                          ┌────────────────┐
-                          │  Intake Logic  │
-                          │  Q1 → Q2 → Q3  │
-                          └────────┬───────┘
-                                   │ Completed
-                                   ▼
-                          ┌────────────────┐
-                          │  Send Calendar │
-                          │  Booking Link  │
-                          └────────────────┘
+┌──────────────┐           ┌───────────────────────┐
+│   Customer   │──Call────▶│  Twilio / CallRail    │
+│   Phone      │           │  Tracking Number      │
+└──────────────┘           └───────────┬───────────┘
+                                       │ Missed Call
+                                       ▼
+                              ┌────────────────┐
+                              │  Voice Webhook │
+                              │  (FastAPI)     │
+                              └────────┬───────┘
+                                       │ Create Lead
+                                       ▼
+                              ┌────────────────┐
+                              │  Background    │
+                              │  Task (5-15s)  │
+                              └────────┬───────┘
+                                       │ Send SMS
+                                       ▼
+┌──────────────┐               ┌───────────────┐
+│  Customer    │◀──SMS─────────│  SMS Webhook  │
+│  Replies     │               │  (FastAPI)    │
+└──────┬───────┘               └───────────────┘
+       │                              │
+       │ "basement flooded"           │ Emergency?
+       └─────────────────────────────▶│ ──Yes──▶ Alert Owner
+                                      │
+                                      │ ──No───▶ Next Step
+                                      ▼
+                              ┌────────────────┐
+                              │  Intake Logic  │
+                              │  Q1 → Q2 → Q3  │
+                              └────────┬───────┘
+                                       │ Completed
+                                       ▼
+                              ┌────────────────┐
+                              │  Send Calendar │
+                              │  Booking Link  │
+                              └────────────────┘
 ```
+
+**Note:** Works with either Twilio or CallRail tracking numbers—same intake flow regardless of provider.
 
 ## Quick Start
 
@@ -172,31 +174,41 @@ Per design requirements, this system does **not** include:
 ## Project Structure
 
 ```
-/workspace/
+speed-to-lead-sms/
 ├── app/
-│   ├── main.py                 # FastAPI app + startup
-│   ├── config.py               # Settings (env vars)
-│   ├── database.py             # SQLAlchemy setup
+│   ├── main.py                      # FastAPI app + startup
+│   ├── config.py                    # Settings (env vars)
+│   ├── database.py                  # SQLAlchemy setup
+│   ├── startup.py                   # Auto-create shop from env vars
 │   ├── models/
-│   │   └── __init__.py         # DB schema: shops, leads, message_logs
+│   │   └── __init__.py              # DB schema: shops, leads, message_logs
 │   ├── routers/
-│   │   ├── voice_webhook.py    # POST /webhooks/twilio/voice
-│   │   └── sms_webhook.py      # POST /webhooks/twilio/sms
+│   │   ├── voice_webhook.py         # POST /webhooks/twilio/voice
+│   │   ├── sms_webhook.py           # POST /webhooks/twilio/sms
+│   │   └── callrail_webhook.py      # POST /webhooks/callrail/{call,sms}
 │   └── services/
-│       ├── intake_logic.py     # Keywords, quiet hours, state machine
-│       ├── twilio_service.py   # SMS send, signature validation
-│       └── background_tasks.py # Delayed initial SMS
+│       ├── intake_logic.py          # Keywords, quiet hours, state machine
+│       ├── twilio_service.py        # Twilio SMS send, signature validation
+│       ├── callrail_service.py      # CallRail SMS send
+│       ├── sms_sender.py            # Multi-provider SMS abstraction
+│       └── background_tasks.py      # Delayed initial SMS
 ├── scripts/
-│   ├── seed_db.py              # Create demo shop
-│   └── generate_friday_audit.py # Weekly intake report CLI
+│   ├── seed_db.py                   # Create demo shop
+│   └── generate_friday_audit.py     # Weekly intake report CLI
 ├── tests/
-│   ├── test_intake.py          # Unit tests (pytest)
-│   └── test_e2e_smoke.py       # End-to-end smoke tests
-├── requirements.txt            # Production dependencies
-├── requirements-dev.txt        # Dev/test dependencies
-├── render.yaml                 # Render.com deployment config
-├── .env.example                # Environment variable template
-└── .gitignore                  # Excludes .env, *.db, __pycache__
+│   ├── test_intake.py               # Intake logic unit tests
+│   ├── test_callrail.py             # CallRail webhook tests
+│   └── test_e2e_smoke.py            # End-to-end smoke tests
+├── docs/
+│   ├── README.md                    # Internal docs index
+│   ├── PRODUCTION_STEPS.md          # Detailed deployment steps
+│   └── TEST_RESULTS.md              # Test run transcripts
+├── requirements.txt                 # Production dependencies
+├── requirements-dev.txt             # Dev/test dependencies
+├── render.yaml                      # Render.com deployment config
+├── .env.example                     # Environment variable template
+├── .gitignore                       # Excludes .env, *.db, __pycache__
+└── LICENSE                          # ISC License
 ```
 
 ## Database Schema
@@ -295,19 +307,16 @@ In CallRail Dashboard:
 
 ## Testing
 
-### Run Unit Tests
+### Run All Tests
 
 ```bash
-PYTHONPATH=. pytest tests/test_intake.py -v
+PYTHONPATH=. pytest tests/ -v
 ```
 
-Tests cover:
-- Emergency keyword detection
-- STOP/opt-out keywords
-- HELP keyword
-- Quiet hours logic
-- State transitions (Q1 → Q2 → Q3)
-- 10-minute caller dedupe
+**13 tests total** covering:
+- Intake logic (emergency keywords, opt-out, HELP, quiet hours, state machine, dedupe)
+- CallRail webhooks (missed calls, SMS intake flow, emergency detection, opt-out)
+- End-to-end smoke tests
 
 ### Run End-to-End Smoke Tests
 
@@ -355,7 +364,8 @@ Dates: 2024-09-01 to 2024-09-07
 
 ## Security & Privacy
 
-- **Twilio Signature Validation** – All webhooks validate `X-Twilio-Signature` header
+- **Twilio Signature Validation** – Twilio webhooks validate `X-Twilio-Signature` header
+- **CallRail Webhooks** – Currently rely on unguessable URL + provider trust (no signature validation implemented)
 - **Environment Variables Only** – No secrets in code or version control
 - **Secure Database** – PostgreSQL with SSL in production
 - **E.164 Phone Format** – Enforced for all phone numbers
