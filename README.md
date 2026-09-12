@@ -10,9 +10,12 @@ When customers call outside business hours, this system detects the missed call 
 [![Twilio](https://img.shields.io/badge/Twilio-Webhooks-orange.svg)](https://www.twilio.com/)
 [![License](https://img.shields.io/badge/License-ISC-lightgrey.svg)](LICENSE)
 
-## Live Demo
+## Demo
 
-This engine powers the proof-of-concept frontend at **[neatclock.pro](https://neatclock.pro)**. This repository contains the production backend API.
+No public API deployment yet. Test locally via:
+- Interactive API docs at `http://localhost:8000/docs`
+- Health check at `http://localhost:8000/health`
+- Unit tests: `pytest tests/ -v`
 
 ## How It Works
 
@@ -30,7 +33,7 @@ Customer calls → Missed → SMS sent automatically → Customer replies
 
 ### Call Flow Details
 
-1. **Missed Call Detected** – Twilio voice webhook triggers on no-answer/busy
+1. **Missed Call Detected** – Twilio/CallRail voice webhook triggers on no-answer/busy
 2. **Auto-SMS Sent** (5-15s delay) – "Sorry we missed your call. What area and issue?"
 3. **Step 1: Area & Problem** – Customer replies, system scans for emergency keywords
 4. **Step 2: Name** – System asks for customer name
@@ -44,12 +47,8 @@ Customer calls → Missed → SMS sent automatically → Customer replies
 
 - **Backend**: Python 3.12+ with FastAPI
 - **Database**: SQLite (dev) / PostgreSQL (production)
-<<<<<<< HEAD
-=======
 - **Integrations**: Twilio Voice & SMS, CallRail Voice & SMS
->>>>>>> origin/main
 - **ORM**: SQLAlchemy 2.0+
-- **Integrations**: Twilio Voice & SMS webhooks
 - **Testing**: pytest with FastAPI TestClient
 - **Deployment**: Render.com (see `render.yaml`)
 
@@ -111,46 +110,7 @@ cp .env.example .env
 # Edit .env - use placeholders for local testing, real values for production
 ```
 
-<<<<<<< HEAD
 ### 3. Seed Demo Data
-=======
-**.env variables:**
-```
-DATABASE_URL=sqlite:///./hvac_intake.db
-
-# SMS Provider: "twilio" (default) or "callrail"
-SMS_PROVIDER=twilio
-
-# Twilio credentials (required if SMS_PROVIDER=twilio)
-TWILIO_ACCOUNT_SID=your_account_sid_here
-TWILIO_AUTH_TOKEN=your_auth_token_here
-
-# CallRail credentials (required if SMS_PROVIDER=callrail)
-CALLRAIL_API_KEY=your_api_key_here
-CALLRAIL_ACCOUNT_ID=your_account_id_here
-CALLRAIL_COMPANY_ID=your_company_id_here
-
-# Startup Shop Configuration (for production/ephemeral deployments)
-SHOP_NAME=Speed-to-Lead Demo
-TWILIO_TRACKING_NUMBER=+13092478859
-SHOP_OWNER_CELL=+15555550199
-BOOKING_CALENDAR_LINK=https://cal.com/demo
-```
-
-**Startup Shop Upsert (Production):**
-
-On platforms with ephemeral filesystems (e.g., Render free tier), the SQLite database resets on every deploy. To ensure your production tracking number works immediately, set `TWILIO_TRACKING_NUMBER` in your environment variables.
-
-The app will automatically create or update a Shop at startup with:
-- `SHOP_NAME` (default: "Speed-to-Lead Demo")
-- `TWILIO_TRACKING_NUMBER` (required; E.164 format)
-- `SHOP_OWNER_CELL` (default: same as tracking number)
-- `BOOKING_CALENDAR_LINK` (default: https://cal.com/demo)
-
-If `TWILIO_TRACKING_NUMBER` is not set, the startup upsert is skipped (useful for local dev).
-
-### 3. Seed Database
->>>>>>> origin/main
 
 ```bash
 PYTHONPATH=. python scripts/seed_db.py
@@ -166,7 +126,6 @@ PYTHONPATH=. python -m app.main
 
 Server starts at `http://0.0.0.0:8000`
 
-<<<<<<< HEAD
 - API docs: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/health`
 
@@ -186,6 +145,8 @@ Expected: 6 tests passing (emergency detection, opt-out, quiet hours, state mach
 | `/health` | GET | Health check (returns `{"status":"ok"}`) |
 | `/webhooks/twilio/voice` | POST | Twilio voice webhook (missed call detection) |
 | `/webhooks/twilio/sms` | POST | Twilio SMS webhook (inbound message handling) |
+| `/webhooks/callrail/call` | POST | CallRail call webhook (missed call detection) |
+| `/webhooks/callrail/sms` | POST | CallRail SMS webhook (inbound message handling) |
 | `/docs` | GET | Interactive API documentation (Swagger UI) |
 
 ## Key Features
@@ -197,6 +158,7 @@ Expected: 6 tests passing (emergency detection, opt-out, quiet hours, state mach
 ✅ **Three-Step Intake** – Area/Problem → Name → Calendar link  
 ✅ **STOP/HELP Compliance** – Standard SMS opt-out handling  
 ✅ **Comprehensive Logging** – All messages logged to `message_logs` table  
+✅ **Multi-Provider Support** – Works with Twilio or CallRail
 
 ## What's NOT Included
 
@@ -287,112 +249,7 @@ See **[DEPLOYMENT.md](DEPLOYMENT.md)** for full production deployment guide cove
 3. Set environment variables
 4. Deploy automatically via `render.yaml`
 5. Configure Twilio webhooks to your Render URL
-=======
-Endpoints:
-- `GET /` - Service info
-- `GET /health` - Health check
-- `POST /webhooks/twilio/voice` - Twilio voice webhook
-- `POST /webhooks/twilio/sms` - Twilio SMS webhook
-- `POST /webhooks/callrail/call` - CallRail call webhook
-- `POST /webhooks/callrail/sms` - CallRail SMS webhook
-- `GET /docs` - Interactive API docs
->>>>>>> origin/main
 
-## Testing
-
-### Run Unit Tests
-
-```bash
-PYTHONPATH=. pytest tests/test_intake.py -v
-```
-
-Tests cover:
-- Emergency keyword detection
-- STOP/opt-out keywords
-- HELP keyword
-- Quiet hours logic
-- State transitions (Q1 → Q2 → Q3)
-- 10-minute caller dedupe
-
-### Run End-to-End Smoke Tests
-
-```bash
-PYTHONPATH=. python tests/test_e2e_smoke.py
-```
-
-Simulates:
-1. STOP keyword (opt-out)
-2. Emergency keyword (owner alert)
-3. Normal intake flow (area → name → booking link)
-4. 10-minute caller dedupe
-
-### Manual Testing
-
-See **[DEMO_RUN.md](DEMO_RUN.md)** for detailed curl examples and expected responses.
-
-## Weekly Audit Report
-
-Generate intake metrics for a date range:
-
-```bash
-PYTHONPATH=. python scripts/generate_friday_audit.py \
-  --shop-id=<uuid> \
-  --start-date=2024-09-01 \
-  --end-date=2024-09-07
-```
-
-**Output example**:
-```
-============================================================
-WEEKLY INTAKE AUDIT: Demo HVAC Company
-============================================================
-Dates: 2024-09-01 to 2024-09-07
-
-• Unanswered Calls Ingested: 45
-• Immediate SMS Sent: 45
-• Intake Form / Text Completed: 32
-• Estimates Booked / Links Sent: 32
-• Emergency Priority Pings Sent: 3
-• Unresponsive / Spam / Dead: 10
-• Flagged Carrier Failures / Opt-Outs: 2
-============================================================
-```
-
-## Security & Privacy
-
-- **Twilio Signature Validation** – All webhooks validate `X-Twilio-Signature` header
-- **Environment Variables Only** – No secrets in code or version control
-- **Secure Database** – PostgreSQL with SSL in production
-- **E.164 Phone Format** – Enforced for all phone numbers
-- **TCPA Compliance** – STOP/HELP handling per SMS best practices
-
-## Production Checklist
-
-Before going live:
-
-- [ ] PostgreSQL database configured (not SQLite)
-- [ ] `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` set
-- [ ] `TWILIO_TRACKING_NUMBER` configured in environment
-- [ ] Twilio voice webhook URL configured
-- [ ] Twilio SMS webhook URL configured
-- [ ] Owner cell number verified
-- [ ] Calendar booking link tested
-- [ ] Emergency keywords customized for business
-- [ ] Quiet hours set correctly
-- [ ] All tests passing (`pytest tests/ -v`)
-- [ ] Health check returns OK
-
-## Why This Stack?
-
-- **FastAPI** – Modern, fast, automatic API docs, excellent async support
-- **SQLAlchemy 2.0** – Type-safe ORM with PostgreSQL production support
-- **Twilio** – Industry-standard SMS/voice APIs, reliable webhooks
-- **Render** – Simple deployment, free tier, automatic PostgreSQL
-- **No LLM** – Deterministic logic keeps costs near-zero and latency low
-
-<<<<<<< HEAD
-## Development Notes
-=======
 ## CallRail Configuration
 
 ### Enable CallRail as SMS Provider
@@ -436,8 +293,99 @@ In CallRail Dashboard:
 
 **Note**: The shop lookup uses the `twilio_tracking_number` field for both Twilio and CallRail tracking numbers. No schema changes needed.
 
-## Deployment
->>>>>>> origin/main
+## Testing
+
+### Run Unit Tests
+
+```bash
+PYTHONPATH=. pytest tests/test_intake.py -v
+```
+
+Tests cover:
+- Emergency keyword detection
+- STOP/opt-out keywords
+- HELP keyword
+- Quiet hours logic
+- State transitions (Q1 → Q2 → Q3)
+- 10-minute caller dedupe
+
+### Run End-to-End Smoke Tests
+
+```bash
+PYTHONPATH=. python tests/test_e2e_smoke.py
+```
+
+Simulates:
+1. STOP keyword (opt-out)
+2. Emergency keyword (owner alert)
+3. Normal intake flow (area → name → booking link)
+4. 10-minute caller dedupe
+
+### Manual Testing
+
+See **[docs/TEST_RESULTS.md](docs/TEST_RESULTS.md)** for detailed curl examples and expected responses.
+
+## Weekly Audit Report
+
+Generate intake metrics for a date range:
+
+```bash
+PYTHONPATH=. python scripts/generate_friday_audit.py \
+  --shop-id=<uuid> \
+  --start-date=2024-09-01 \
+  --end-date=2024-09-07
+```
+
+**Output example**:
+```
+============================================================
+WEEKLY INTAKE AUDIT: Demo HVAC Company
+============================================================
+Dates: 2024-09-01 to 2024-09-07
+
+• Unanswered Calls Ingested: 45
+• Immediate SMS Sent: 45
+• Intake Form / Text Completed: 32
+• Estimates Booked / Links Sent: 32
+• Emergency Priority Pings Sent: 3
+• Unresponsive / Spam / Dead: 10
+• Flagged Carrier Failures / Opt-Outs: 2
+============================================================
+```
+
+## Security & Privacy
+
+- **Twilio Signature Validation** – All webhooks validate `X-Twilio-Signature` header
+- **Environment Variables Only** – No secrets in code or version control
+- **Secure Database** – PostgreSQL with SSL in production
+- **E.164 Phone Format** – Enforced for all phone numbers
+- **TCPA Compliance** – STOP/HELP handling per SMS best practices
+
+## Production Checklist
+
+Before going live:
+
+- [ ] PostgreSQL database configured (not SQLite)
+- [ ] `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` set (or CallRail credentials)
+- [ ] `TWILIO_TRACKING_NUMBER` configured in environment
+- [ ] Twilio voice webhook URL configured (or CallRail)
+- [ ] Twilio SMS webhook URL configured (or CallRail)
+- [ ] Owner cell number verified
+- [ ] Calendar booking link tested
+- [ ] Emergency keywords customized for business
+- [ ] Quiet hours set correctly
+- [ ] All tests passing (`pytest tests/ -v`)
+- [ ] Health check returns OK
+
+## Why This Stack?
+
+- **FastAPI** – Modern, fast, automatic API docs, excellent async support
+- **SQLAlchemy 2.0** – Type-safe ORM with PostgreSQL production support
+- **Twilio/CallRail** – Industry-standard SMS/voice APIs, reliable webhooks
+- **Render** – Simple deployment, free tier, automatic PostgreSQL
+- **No LLM** – Deterministic logic keeps costs near-zero and latency low
+
+## Development Notes
 
 ### Add a New Shop
 
@@ -491,4 +439,4 @@ Built as part of OpenClassrooms Application Developer apprenticeship portfolio
 
 ## Related Projects
 
-- **NeatClock** ([neatclock.pro](https://neatclock.pro)) – Frontend proof-of-concept UI for this intake engine
+- **[NeatClock](https://neatclock.pro)** – Separate portfolio project: recurring calendar event generator (.ics file creator) built with React + Vite. Not related to this SMS intake engine.
