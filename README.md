@@ -6,7 +6,7 @@
 
 - **Backend**: Python 3.12+ with FastAPI
 - **Database**: SQLite (dev) / PostgreSQL (production)
-- **Integrations**: Twilio Voice & SMS
+- **Integrations**: Twilio Voice & SMS, CallRail Voice & SMS
 - **ORM**: SQLAlchemy 2.0+
 - **Testing**: pytest
 
@@ -139,8 +139,18 @@ cp .env.example .env
 **.env variables:**
 ```
 DATABASE_URL=sqlite:///./hvac_intake.db
+
+# SMS Provider: "twilio" (default) or "callrail"
+SMS_PROVIDER=twilio
+
+# Twilio credentials (required if SMS_PROVIDER=twilio)
 TWILIO_ACCOUNT_SID=your_account_sid_here
 TWILIO_AUTH_TOKEN=your_auth_token_here
+
+# CallRail credentials (required if SMS_PROVIDER=callrail)
+CALLRAIL_API_KEY=your_api_key_here
+CALLRAIL_ACCOUNT_ID=your_account_id_here
+CALLRAIL_COMPANY_ID=your_company_id_here
 
 # Startup Shop Configuration (for production/ephemeral deployments)
 SHOP_NAME=Speed-to-Lead Demo
@@ -183,8 +193,10 @@ Server starts at: `http://0.0.0.0:8000`
 Endpoints:
 - `GET /` - Service info
 - `GET /health` - Health check
-- `POST /webhooks/twilio/voice` - Voice webhook
-- `POST /webhooks/twilio/sms` - SMS webhook
+- `POST /webhooks/twilio/voice` - Twilio voice webhook
+- `POST /webhooks/twilio/sms` - Twilio SMS webhook
+- `POST /webhooks/callrail/call` - CallRail call webhook
+- `POST /webhooks/callrail/sms` - CallRail SMS webhook
 - `GET /docs` - Interactive API docs
 
 ## Testing
@@ -257,6 +269,49 @@ Same page, under **Messaging Configuration**:
 1. **A MESSAGE COMES IN**: Webhook
 2. **URL**: `https://your-domain.com/webhooks/twilio/sms`
 3. **HTTP Method**: POST
+
+## CallRail Configuration
+
+### Enable CallRail as SMS Provider
+
+Set environment variable:
+```bash
+SMS_PROVIDER=callrail
+```
+
+### CallRail API Credentials
+
+1. Log into [CallRail Dashboard](https://app.callrail.com/)
+2. Go to **Settings → API** (https://app.callrail.com/settings/api)
+3. Create an API token or use existing token
+4. Find your Account ID (in URL: `app.callrail.com/a/{ACCOUNT_ID}/...`)
+5. Find your Company ID (in URL when viewing company: `app.callrail.com/a/{ACCOUNT_ID}/companies/{COMPANY_ID}`)
+
+Set environment variables:
+```bash
+CALLRAIL_API_KEY=your_api_key_here
+CALLRAIL_ACCOUNT_ID=your_account_id_here
+CALLRAIL_COMPANY_ID=your_company_id_here
+```
+
+### CallRail Webhook Configuration
+
+In CallRail Dashboard:
+
+1. Go to **Settings → Integrations → Webhooks**
+2. Create two webhooks:
+
+**Post-Call Webhook:**
+- **Webhook URL**: `https://your-domain.com/webhooks/callrail/call`
+- **Events**: Select "Post-Call" (fires after call completes)
+- **Format**: JSON
+
+**Text Message Received Webhook:**
+- **Webhook URL**: `https://your-domain.com/webhooks/callrail/sms`
+- **Events**: Select "Text Message Received"
+- **Format**: JSON
+
+**Note**: The shop lookup uses the `twilio_tracking_number` field for both Twilio and CallRail tracking numbers. No schema changes needed.
 
 ## Deployment
 
