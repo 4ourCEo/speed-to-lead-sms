@@ -137,7 +137,7 @@ Server starts at `http://0.0.0.0:8000`
 PYTHONPATH=. pytest tests/ -v
 ```
 
-Expected: 13 tests passing (intake logic + CallRail webhooks + e2e smoke tests). See [Testing](#testing) section for details.
+Expected: 27 tests passing (intake logic + CallRail webhooks + owner notifications + e2e smoke tests). See [Testing](#testing) section for details.
 
 ## API Endpoints
 
@@ -160,7 +160,97 @@ Expected: 13 tests passing (intake logic + CallRail webhooks + e2e smoke tests).
 ✅ **Three-Step Intake** – Area/Problem → Name → Calendar link  
 ✅ **STOP/HELP Compliance** – Standard SMS opt-out handling  
 ✅ **Comprehensive Logging** – All messages logged to `message_logs` table  
-✅ **Multi-Provider Support** – Works with Twilio or CallRail
+✅ **Multi-Provider Support** – Works with Twilio or CallRail  
+✅ **$0 Interim Owner Notifications** – Notify shop owners via Slack and/or email when missed calls arrive (NEW)
+
+## Owner Notification System (Interim $0 Path)
+
+For scenarios where SMS to the caller may not be desirable or cost-effective, the system now supports **owner notifications** via Slack and email when a missed call arrives.
+
+### Features
+
+- **Slack Notifications** – Send instant alerts to a Slack channel via incoming webhook
+- **Email Notifications** – Send HTML email alerts via Resend API (optional)
+- **SMS Fallback** – Original SMS-to-caller flow remains available and can be enabled/disabled via environment variable
+- **Idempotent** – Prevents duplicate notifications for the same call_id even if webhooks retry
+- **Zero Cost** – Uses free Slack webhooks and optional email (Resend free tier: 100 emails/day)
+
+### Configuration
+
+Set these environment variables to enable owner notifications:
+
+```bash
+# Disable SMS to caller (optional, recommended for cost savings)
+INTERIM_NO_SMS=true
+
+# Slack incoming webhook URL
+SLACK_WEBHOOK_URL=https://hooks.slack.com/services/YOUR/WEBHOOK/URL
+
+# Email notification (optional, requires Resend API key)
+OWNER_NOTIFY_EMAIL=owner@example.com
+RESEND_API_KEY=re_your_api_key_here
+
+# Custom callback phone number (optional, shown in notifications)
+OWNER_CALLBACK_PHONE=+15551234567
+```
+
+### Notification Content
+
+Both Slack and email notifications include:
+- **Shop name** – Which business received the call
+- **Caller number** – Customer's phone number (E.164 format)
+- **Tracking number** – Which tracking number was called
+- **Timestamp** – When the call occurred (UTC)
+- **Call-back CTA** – Clear prompt to call the customer back
+- **Lead ID** – Internal tracking ID for reference
+
+### How It Works
+
+1. **Missed Call Detected** – Voice webhook (Twilio or CallRail) creates a lead
+2. **Background Task Triggered** – Runs after 5-15s delay
+3. **Check SMS Config** – If `INTERIM_NO_SMS=true`, skip SMS to caller
+4. **Send Owner Notification** – Slack and/or email alert sent immediately
+5. **Idempotency Check** – `owner_notified` flag prevents duplicate alerts
+
+### Slack Message Example
+
+```
+📞 Missed Call Alert
+
+Shop: Speed-to-Lead Demo
+Time: 2024-09-12 10:30 AM UTC
+Caller: +15559876543
+Tracking #: +15551234567
+
+🔔 Call them back: +15551234567
+
+Lead ID: lead-uuid-here
+```
+
+### Email HTML Example
+
+Subject: `Missed Call Alert - Speed-to-Lead Demo`
+
+- Clean HTML template with caller info
+- Clickable phone number link (`tel:` protocol)
+- Same information as Slack message
+- Plain text fallback included
+
+### Testing
+
+The notification system includes comprehensive unit tests:
+
+```bash
+PYTHONPATH=. pytest tests/test_owner_notifications.py -v
+```
+
+14 tests covering:
+- Slack webhook success/failure
+- Email API success/failure
+- Missing credentials handling
+- Exception handling
+- Idempotency
+- Environment variable flags
 
 ## What's NOT Included
 
@@ -191,7 +281,8 @@ speed-to-lead-sms/
 │       ├── twilio_service.py        # Twilio SMS send, signature validation
 │       ├── callrail_service.py      # CallRail SMS send
 │       ├── sms_sender.py            # Multi-provider SMS abstraction
-│       └── background_tasks.py      # Delayed initial SMS
+│       ├── owner_notifications.py   # Slack + email notifications (NEW)
+│       └── background_tasks.py      # Delayed initial SMS + owner alerts
 ├── scripts/
 │   ├── seed_db.py                   # Create demo shop
 │   └── generate_friday_audit.py     # Weekly intake report CLI
@@ -233,6 +324,7 @@ speed-to-lead-sms/
 - `current_step` (INTEGER: 0=Initial, 1=Awaiting Area/Problem, 2=Awaiting Name, 3=Finished)
 - `customer_name`, `area_neighborhood`, `problem_description` (nullable TEXT)
 - `is_emergency` (BOOLEAN)
+- `owner_notified` (BOOLEAN, default: false) – NEW: Tracks if owner notification sent
 - `created_at`, `updated_at` (TIMESTAMP UTC)
 
 ### `message_logs`
@@ -313,9 +405,10 @@ In CallRail Dashboard:
 PYTHONPATH=. pytest tests/ -v
 ```
 
-**13 tests total** covering:
+**27 tests total** covering:
 - Intake logic (emergency keywords, opt-out, HELP, quiet hours, state machine, dedupe)
 - CallRail webhooks (missed calls, SMS intake flow, emergency detection, opt-out)
+- Owner notifications (Slack, email, idempotency, error handling) – NEW
 - End-to-end smoke tests
 
 ### Run End-to-End Smoke Tests
