@@ -137,7 +137,7 @@ Server starts at `http://0.0.0.0:8000`
 PYTHONPATH=. pytest tests/ -v
 ```
 
-Expected: 6 tests passing (emergency detection, opt-out, quiet hours, state machine, dedupe).
+Expected: 13 tests passing (intake logic + CallRail webhooks + e2e smoke tests). See [Testing](#testing) section for details.
 
 ## API Endpoints
 
