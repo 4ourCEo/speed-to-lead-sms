@@ -19,7 +19,7 @@ def upsert_shop_from_env(db: Session) -> None:
     even on ephemeral filesystems.
     
     Environment variables:
-    - TWILIO_TRACKING_NUMBER (required): E.164 format (e.g. +13092478859)
+    - TWILIO_TRACKING_NUMBER (required): E.164 format (e.g. +15555550100)
     - SHOP_NAME (default: "Speed-to-Lead Demo")
     - SHOP_OWNER_CELL (default: same as TWILIO_TRACKING_NUMBER or +15555550199)
     - BOOKING_CALENDAR_LINK (default: https://cal.com/demo)

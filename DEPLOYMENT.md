@@ -1,293 +1,320 @@
 # Deployment Guide
 
-This guide covers deploying the HVAC SMS webhook worker to Cloudflare Workers.
+This guide covers deploying the FastAPI application to production hosting platforms.
 
 ## Prerequisites
 
-- [Node.js](https://nodejs.org/) 18+ installed
-- [Cloudflare account](https://dash.cloudflare.com/sign-up) (free tier works)
-- [Twilio account](https://www.twilio.com/try-twilio) with a phone number
-- [xAI API key](https://x.ai/) for Grok access
+- Python 3.12+
+- Twilio account with a phone number ([sign up](https://www.twilio.com/try-twilio))
+- PostgreSQL database (for production) or SQLite (for local dev)
+- Cal.com or similar booking calendar link
 
-## Initial Setup
+## Platform Options
 
-### 1. Clone and Install
+This application can be deployed to any platform supporting Python web apps. Recommended options:
 
-```bash
-git clone <your-repo-url>
-cd hvac-sms-webhook
-npm install
-```
+### Option 1: Render.com (Recommended)
 
-### 2. Authenticate with Cloudflare
+**Pros**: Free tier available, automatic PostgreSQL, simple configuration via `render.yaml`
 
-```bash
-npx wrangler login
-```
+**Steps:**
 
-This opens a browser window to authorize Wrangler with your Cloudflare account.
+1. Push code to GitHub (private or public repository)
 
-### 3. Configure Secrets
+2. Create new Web Service on [Render Dashboard](https://dashboard.render.com/)
+   - Connect your GitHub repository
+   - Render auto-detects settings from `render.yaml`
 
-Set all required environment variables as Cloudflare secrets:
+3. Add PostgreSQL database:
+   - Create new PostgreSQL instance in Render
+   - Copy the **Internal Database URL** from database info page
+   
+4. Set environment variables in Render dashboard:
+   ```
+   DATABASE_URL=<internal-database-url-from-render>
+   TWILIO_ACCOUNT_SID=<from-twilio-console>
+   TWILIO_AUTH_TOKEN=<from-twilio-console>
+   TWILIO_TRACKING_NUMBER=<your-twilio-number-in-e164>
+   SHOP_NAME=Your Business Name
+   SHOP_OWNER_CELL=<owner-phone-in-e164>
+   BOOKING_CALENDAR_LINK=<your-cal-com-link>
+   PYTHONPATH=/opt/render/project/src
+   ```
 
-```bash
-# Twilio configuration
-npx wrangler secret put TWILIO_AUTH_TOKEN
-# Paste your Twilio auth token (found at twilio.com/console)
+5. Deploy - Render will:
+   - Run `pip install -r requirements.txt`
+   - Start with `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+   - Create tables automatically via `app.main.py` startup
 
-# xAI configuration
-npx wrangler secret put XAI_API_KEY
-# Paste your xAI API key (from x.ai)
+6. Note your deployment URL (e.g., `https://your-app.onrender.com`)
 
-# Shop configuration
-npx wrangler secret put SHOP_NAME
-# e.g., "ABC Heating & Cooling"
+### Option 2: Railway
 
-npx wrangler secret put SHOP_CALENDAR_URL
-# e.g., "https://cal.com/abc-hvac/15min"
+**Pros**: Simple deployment, automatic PostgreSQL provisioning
 
-npx wrangler secret put SHOP_OWNER_CELL
-# e.g., "+15551234567" (E.164 format)
+**Steps:**
 
-# Optional: Quiet hours (defaults to 09:00-21:00 ET)
-npx wrangler secret put SHOP_QUIET_HOURS_START
-# e.g., "09:00"
+1. Install Railway CLI:
+   ```bash
+   npm i -g @railway/cli
+   railway login
+   ```
 
-npx wrangler secret put SHOP_QUIET_HOURS_END
-# e.g., "21:00"
+2. Initialize project:
+   ```bash
+   railway init
+   railway add --database postgresql
+   ```
 
-npx wrangler secret put SHOP_TIMEZONE
-# e.g., "America/New_York"
+3. Set environment variables:
+   ```bash
+   railway variables set TWILIO_ACCOUNT_SID=<your-sid>
+   railway variables set TWILIO_AUTH_TOKEN=<your-token>
+   railway variables set TWILIO_TRACKING_NUMBER=<your-number>
+   railway variables set SHOP_NAME="Your Business"
+   railway variables set SHOP_OWNER_CELL=<your-cell>
+   railway variables set BOOKING_CALENDAR_LINK=<your-link>
+   ```
 
-# Optional: Custom emergency keywords
-npx wrangler secret put EMERGENCY_KEYWORDS
-# e.g., "no heat,flooded,gas leak"
-```
+4. Deploy:
+   ```bash
+   railway up
+   ```
 
-## Deploy to Production
+5. Get deployment URL:
+   ```bash
+   railway domain
+   ```
 
-### First Deployment
+### Option 3: Fly.io
 
-```bash
-npm run deploy
-```
+**Pros**: Global edge deployment, generous free tier
 
-This command:
-1. Compiles TypeScript
-2. Bundles the worker
-3. Creates the Durable Object namespace
-4. Deploys to Cloudflare's edge network
+**Steps:**
 
-You'll see output like:
+1. Install Fly CLI and authenticate:
+   ```bash
+   curl -L https://fly.io/install.sh | sh
+   fly auth login
+   ```
 
-```
-Published hvac-sms-webhook (1.23 sec)
-  https://hvac-sms-webhook.<your-subdomain>.workers.dev
-Current Deployment ID: <deployment-id>
-```
+2. Launch app:
+   ```bash
+   fly launch
+   # Choose app name and region
+   # Say NO to PostgreSQL for now (we'll add it separately)
+   ```
 
-**Save this URL** - you'll need it for Twilio configuration.
+3. Create PostgreSQL:
+   ```bash
+   fly postgres create
+   fly postgres attach <postgres-app-name>
+   ```
 
-### Subsequent Deployments
+4. Set secrets:
+   ```bash
+   fly secrets set TWILIO_ACCOUNT_SID=<your-sid>
+   fly secrets set TWILIO_AUTH_TOKEN=<your-token>
+   fly secrets set TWILIO_TRACKING_NUMBER=<your-number>
+   fly secrets set SHOP_NAME="Your Business"
+   fly secrets set SHOP_OWNER_CELL=<your-cell>
+   fly secrets set BOOKING_CALENDAR_LINK=<your-link>
+   ```
 
-Just run `npm run deploy` again. Cloudflare automatically:
-- Deploys the new version
-- Routes traffic gradually (canary deployment)
-- Rolls back automatically if errors spike
+5. Deploy:
+   ```bash
+   fly deploy
+   ```
 
-## Twilio Configuration
+## Configure Twilio Webhooks
 
-### 1. Configure Webhook URL
+After deployment, configure Twilio to send webhooks to your app:
+
+### Voice Webhook (Missed Calls)
 
 1. Go to [Twilio Console → Phone Numbers](https://console.twilio.com/us1/develop/phone-numbers/manage/incoming)
-2. Click your phone number
-3. Scroll to "Messaging Configuration"
-4. Set "A MESSAGE COMES IN" to:
-   - **Webhook**: `https://hvac-sms-webhook.<your-subdomain>.workers.dev/webhook/sms`
+2. Select your phone number
+3. Under **Voice Configuration**:
+   - **A CALL COMES IN**: Webhook
+   - **URL**: `https://your-deployment-url.com/webhooks/twilio/voice`
    - **HTTP Method**: POST
-5. Click "Save"
+4. Click **Save**
 
-### 2. Test the Integration
+### SMS Webhook (Inbound Messages)
 
-Send a text message to your Twilio number:
+Same phone number page, under **Messaging Configuration**:
 
-```
-"Living room has no heat"
-```
+1. **A MESSAGE COMES IN**: Webhook
+2. **URL**: `https://your-deployment-url.com/webhooks/twilio/sms`
+3. **HTTP Method**: POST
+4. Click **Save configuration**
 
-You should receive a response from the bot asking for details.
+## Verify Deployment
 
-### 3. Monitor Webhook Activity
-
-View real-time webhook logs:
-
-```bash
-npx wrangler tail
-```
-
-This streams live logs from your worker, useful for debugging.
-
-## Monitoring
-
-### Cloudflare Dashboard
-
-1. Go to [Cloudflare Dashboard → Workers](https://dash.cloudflare.com/)
-2. Click "hvac-sms-webhook"
-3. View:
-   - Request volume
-   - Error rates
-   - Latency (p50, p99)
-   - Durable Object metrics
-
-### Health Check
-
-Test the worker is running:
+### 1. Health Check
 
 ```bash
-curl https://hvac-sms-webhook.<your-subdomain>.workers.dev/health
+curl https://your-deployment-url.com/health
 ```
 
-Expected response:
-```json
-{
-  "status": "ok",
-  "timestamp": 1694392800000
-}
+Expected: `{"status":"ok"}`
+
+### 2. Check Shop Created
+
+The app automatically creates/updates a shop from environment variables at startup. Check logs for:
+
 ```
+✓ Created shop: <uuid>
+  Name: Your Business
+  Tracking: +15551234567
+  Owner Cell: +15559876543
+  Calendar: https://cal.com/your-link
+```
+
+### 3. Test Voice Webhook
+
+Call your Twilio number and hang up after 2-3 rings. You should receive an SMS within 15 seconds.
+
+### 4. Test SMS Flow
+
+Reply to the SMS with your issue (e.g., "Living room AC broken"). The bot should ask for your name, then send a booking link.
+
+## Monitoring & Logs
+
+### Render
+
+View logs in dashboard or via CLI:
+```bash
+render logs --tail
+```
+
+### Railway
+
+```bash
+railway logs
+```
+
+### Fly.io
+
+```bash
+fly logs
+```
+
+## Database Migrations
+
+The app uses SQLAlchemy and auto-creates tables at startup (`Base.metadata.create_all`). For schema changes:
+
+1. Update models in `app/models/__init__.py`
+2. Redeploy - tables will be updated automatically
+
+**Note**: For production, consider using Alembic for proper migrations to avoid data loss.
+
+## Environment Variables Reference
+
+| Variable | Required | Default | Description |
+|----------|----------|---------|-------------|
+| `DATABASE_URL` | Yes | `sqlite:///./hvac_intake.db` | PostgreSQL connection string (production) |
+| `SMS_PROVIDER` | No | `twilio` | SMS provider: `twilio` or `callrail` |
+| **Twilio Credentials** | | | **Required if SMS_PROVIDER=twilio** |
+| `TWILIO_ACCOUNT_SID` | Conditional | - | From Twilio console |
+| `TWILIO_AUTH_TOKEN` | Conditional | - | From Twilio console |
+| `TWILIO_TRACKING_NUMBER` | Recommended | - | Shop tracking number (E.164) |
+| **CallRail Credentials** | | | **Required if SMS_PROVIDER=callrail** |
+| `CALLRAIL_API_KEY` | Conditional | - | From CallRail Settings → API |
+| `CALLRAIL_ACCOUNT_ID` | Conditional | - | From CallRail dashboard URL |
+| `CALLRAIL_COMPANY_ID` | Conditional | - | From CallRail dashboard URL |
+| **Shop Configuration** | | | |
+| `SHOP_NAME` | No | "Speed-to-Lead Demo" | Business name |
+| `SHOP_OWNER_CELL` | No | Same as tracking | Owner emergency contact (E.164) |
+| `BOOKING_CALENDAR_LINK` | No | https://cal.com/demo | Booking URL |
+| **Server Settings** | | | |
+| `PYTHONPATH` | Platform-specific | - | Set to `/opt/render/project/src` on Render |
+| `HOST` | No | 0.0.0.0 | Server bind address |
+| `PORT` | No | 8000 | Server port (overridden by platform) |
+| `DEBUG` | No | false | Debug mode flag |
+
+**Note:** For CallRail webhook configuration (URL setup, event selection), see the CallRail Configuration section in the main [README.md](README.md#callrail-configuration).
 
 ## Troubleshooting
 
-### Signature Validation Failures
+### Webhooks Not Triggering
 
-**Symptom**: All webhooks return 401 Unauthorized
+- Verify webhook URLs are correct (https://)
+- Check Twilio Debugger: https://console.twilio.com/us1/monitor/logs/debugger
+- Ensure app is publicly accessible
 
-**Solution**: Verify TWILIO_AUTH_TOKEN is correct:
+### SMS Not Sending
 
-```bash
-npx wrangler secret list
-# Check if TWILIO_AUTH_TOKEN is set
+- Check `TWILIO_ACCOUNT_SID` and `TWILIO_AUTH_TOKEN` are set
+- View application logs for error messages
+- Check Twilio SMS logs: https://console.twilio.com/us1/monitor/logs/sms
 
-# Update if needed
-npx wrangler secret put TWILIO_AUTH_TOKEN
-```
+### Database Connection Errors
 
-### Grok API Errors
+- Verify `DATABASE_URL` format: `postgresql://user:pass@host:port/dbname`
+- Check database is accessible from your deployment
+- Review platform-specific database connection docs
 
-**Symptom**: Bot doesn't respond or returns error message
+### Emergency Alerts Not Working
 
-**Solution**: Check XAI_API_KEY:
-
-```bash
-# Verify secret is set
-npx wrangler secret list
-
-# Test Grok API manually
-curl https://api.x.ai/v1/chat/completions \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -H "Content-Type: application/json" \
-  -d '{"model":"grok-4.6","messages":[{"role":"user","content":"test"}]}'
-```
-
-### State Not Persisting
-
-**Symptom**: Bot always asks the same question
-
-**Solution**: Ensure Durable Objects migration ran:
-
-```bash
-# Redeploy to apply migrations
-npm run deploy
-```
-
-### Deploy Failures
-
-**Symptom**: `wrangler deploy` fails
-
-**Common causes**:
-- Not logged in: Run `npx wrangler login`
-- Syntax errors: Run `npm test` locally first
-- Missing secrets: Set all required secrets (see step 3)
-
-## Rollback
-
-If a deployment has issues, rollback to the previous version:
-
-```bash
-# List recent deployments
-npx wrangler deployments list
-
-# Rollback to specific deployment
-npx wrangler rollback <deployment-id>
-```
-
-## Custom Domain (Optional)
-
-To use a custom domain like `sms.yourdomain.com`:
-
-1. Add domain to Cloudflare (if not already)
-2. Add a route in Wrangler config:
-
-```toml
-# wrangler.toml
-routes = [
-  { pattern = "sms.yourdomain.com/webhook/sms", zone_name = "yourdomain.com" }
-]
-```
-
-3. Deploy: `npm run deploy`
-4. Update Twilio webhook URL to use custom domain
-
-## Costs
-
-### Free Tier (included)
-
-- 100,000 requests/day
-- 10ms CPU time per request
-- Durable Objects: 1GB storage + 1M requests
-
-### Beyond Free Tier
-
-- Workers: $5/month for 10M requests
-- Durable Objects: $0.15 per million requests
-- Storage: $0.20 per GB-month
-
-**Typical usage**: A shop handling 50 SMS/day stays well within free tier.
-
-## Security Best Practices
-
-1. **Never commit secrets**: Use `wrangler secret put`
-2. **Keep TWILIO_AUTH_TOKEN secure**: Enables signature validation
-3. **Rotate XAI_API_KEY periodically**: Update via `wrangler secret put`
-4. **Monitor logs**: Watch for suspicious activity via `wrangler tail`
-
-## Support
-
-- **Cloudflare Workers**: https://developers.cloudflare.com/workers/
-- **Twilio Webhooks**: https://www.twilio.com/docs/usage/webhooks
-- **xAI API**: https://docs.x.ai/
+- Ensure emergency keywords are configured in shop table
+- Verify `SHOP_OWNER_CELL` is in E.164 format (+15551234567)
+- Check message contains emergency keyword (case-insensitive)
 
 ## Production Checklist
 
 Before going live:
 
-- [ ] All secrets configured in Cloudflare
-- [ ] Deployed to production (`npm run deploy`)
-- [ ] Twilio webhook URL configured
-- [ ] Health check passes
-- [ ] Test STOP keyword works
-- [ ] Test emergency keywords trigger owner notification
-- [ ] Verify quiet hours enforcement
-- [ ] Test full conversation flow (Q1 → Q2 → calendar)
-- [ ] Monitor logs for first few real conversations
-- [ ] Backup event data strategy in place
+- [ ] PostgreSQL database configured (not SQLite)
+- [ ] All environment variables set
+- [ ] Twilio voice webhook configured
+- [ ] Twilio SMS webhook configured
+- [ ] Health check returns OK
+- [ ] Test call → SMS flow works
+- [ ] Test emergency keyword detection
+- [ ] Test STOP opt-out handling
+- [ ] Owner cell number verified
+- [ ] Calendar link tested and working
 
-## Next Steps
+## Security Best Practices
 
-After successful deployment:
+1. **Never commit secrets** - Use environment variables only
+2. **Use PostgreSQL in production** - SQLite resets on platform restarts
+3. **Keep dependencies updated** - Run `pip list --outdated` periodically
+4. **Monitor logs** - Watch for suspicious activity or errors
+5. **Validate Twilio signatures** - Already implemented in `app/services/twilio_service.py`
 
-1. Monitor first week of usage via Cloudflare dashboard
-2. Review event logs to tune keyword detection
-3. Adjust quiet hours based on actual call patterns
-4. Consider adding analytics dashboard (query Durable Object events)
-5. Set up alerts for error rate spikes (Cloudflare Notifications)
+## Cost Estimates
+
+### Render.com Free Tier
+
+- Web Service: Free (spins down after 15 min inactivity)
+- PostgreSQL: Free (90-day expiration, then $7/month)
+- Suitable for: Demo, low-volume testing
+
+### Railway
+
+- $5/month credit free
+- ~$5-10/month for small production use
+- Pay-as-you-go pricing
+
+### Fly.io
+
+- Free tier: 3 shared VMs, 3GB storage
+- Suitable for: Small production deployments
+
+### Twilio
+
+- Phone number: ~$1/month
+- SMS: $0.0079/message (outbound)
+- Voice: $0.013/minute (inbound)
+
+**Example**: 100 calls/month = ~$8/month total (Twilio + hosting)
+
+## Support Resources
+
+- **FastAPI Docs**: https://fastapi.tiangolo.com/
+- **Twilio Webhooks**: https://www.twilio.com/docs/usage/webhooks
+- **Render Docs**: https://render.com/docs
+- **Railway Docs**: https://docs.railway.app/
+- **Fly.io Docs**: https://fly.io/docs/
