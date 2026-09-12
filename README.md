@@ -44,6 +44,10 @@ Customer calls → Missed → SMS sent automatically → Customer replies
 
 - **Backend**: Python 3.12+ with FastAPI
 - **Database**: SQLite (dev) / PostgreSQL (production)
+<<<<<<< HEAD
+=======
+- **Integrations**: Twilio Voice & SMS, CallRail Voice & SMS
+>>>>>>> origin/main
 - **ORM**: SQLAlchemy 2.0+
 - **Integrations**: Twilio Voice & SMS webhooks
 - **Testing**: pytest with FastAPI TestClient
@@ -107,7 +111,46 @@ cp .env.example .env
 # Edit .env - use placeholders for local testing, real values for production
 ```
 
+<<<<<<< HEAD
 ### 3. Seed Demo Data
+=======
+**.env variables:**
+```
+DATABASE_URL=sqlite:///./hvac_intake.db
+
+# SMS Provider: "twilio" (default) or "callrail"
+SMS_PROVIDER=twilio
+
+# Twilio credentials (required if SMS_PROVIDER=twilio)
+TWILIO_ACCOUNT_SID=your_account_sid_here
+TWILIO_AUTH_TOKEN=your_auth_token_here
+
+# CallRail credentials (required if SMS_PROVIDER=callrail)
+CALLRAIL_API_KEY=your_api_key_here
+CALLRAIL_ACCOUNT_ID=your_account_id_here
+CALLRAIL_COMPANY_ID=your_company_id_here
+
+# Startup Shop Configuration (for production/ephemeral deployments)
+SHOP_NAME=Speed-to-Lead Demo
+TWILIO_TRACKING_NUMBER=+13092478859
+SHOP_OWNER_CELL=+15555550199
+BOOKING_CALENDAR_LINK=https://cal.com/demo
+```
+
+**Startup Shop Upsert (Production):**
+
+On platforms with ephemeral filesystems (e.g., Render free tier), the SQLite database resets on every deploy. To ensure your production tracking number works immediately, set `TWILIO_TRACKING_NUMBER` in your environment variables.
+
+The app will automatically create or update a Shop at startup with:
+- `SHOP_NAME` (default: "Speed-to-Lead Demo")
+- `TWILIO_TRACKING_NUMBER` (required; E.164 format)
+- `SHOP_OWNER_CELL` (default: same as tracking number)
+- `BOOKING_CALENDAR_LINK` (default: https://cal.com/demo)
+
+If `TWILIO_TRACKING_NUMBER` is not set, the startup upsert is skipped (useful for local dev).
+
+### 3. Seed Database
+>>>>>>> origin/main
 
 ```bash
 PYTHONPATH=. python scripts/seed_db.py
@@ -123,6 +166,7 @@ PYTHONPATH=. python -m app.main
 
 Server starts at `http://0.0.0.0:8000`
 
+<<<<<<< HEAD
 - API docs: `http://localhost:8000/docs`
 - Health check: `http://localhost:8000/health`
 
@@ -243,6 +287,16 @@ See **[DEPLOYMENT.md](DEPLOYMENT.md)** for full production deployment guide cove
 3. Set environment variables
 4. Deploy automatically via `render.yaml`
 5. Configure Twilio webhooks to your Render URL
+=======
+Endpoints:
+- `GET /` - Service info
+- `GET /health` - Health check
+- `POST /webhooks/twilio/voice` - Twilio voice webhook
+- `POST /webhooks/twilio/sms` - Twilio SMS webhook
+- `POST /webhooks/callrail/call` - CallRail call webhook
+- `POST /webhooks/callrail/sms` - CallRail SMS webhook
+- `GET /docs` - Interactive API docs
+>>>>>>> origin/main
 
 ## Testing
 
@@ -336,7 +390,54 @@ Before going live:
 - **Render** – Simple deployment, free tier, automatic PostgreSQL
 - **No LLM** – Deterministic logic keeps costs near-zero and latency low
 
+<<<<<<< HEAD
 ## Development Notes
+=======
+## CallRail Configuration
+
+### Enable CallRail as SMS Provider
+
+Set environment variable:
+```bash
+SMS_PROVIDER=callrail
+```
+
+### CallRail API Credentials
+
+1. Log into [CallRail Dashboard](https://app.callrail.com/)
+2. Go to **Settings → API** (https://app.callrail.com/settings/api)
+3. Create an API token or use existing token
+4. Find your Account ID (in URL: `app.callrail.com/a/{ACCOUNT_ID}/...`)
+5. Find your Company ID (in URL when viewing company: `app.callrail.com/a/{ACCOUNT_ID}/companies/{COMPANY_ID}`)
+
+Set environment variables:
+```bash
+CALLRAIL_API_KEY=your_api_key_here
+CALLRAIL_ACCOUNT_ID=your_account_id_here
+CALLRAIL_COMPANY_ID=your_company_id_here
+```
+
+### CallRail Webhook Configuration
+
+In CallRail Dashboard:
+
+1. Go to **Settings → Integrations → Webhooks**
+2. Create two webhooks:
+
+**Post-Call Webhook:**
+- **Webhook URL**: `https://your-domain.com/webhooks/callrail/call`
+- **Events**: Select "Post-Call" (fires after call completes)
+- **Format**: JSON
+
+**Text Message Received Webhook:**
+- **Webhook URL**: `https://your-domain.com/webhooks/callrail/sms`
+- **Events**: Select "Text Message Received"
+- **Format**: JSON
+
+**Note**: The shop lookup uses the `twilio_tracking_number` field for both Twilio and CallRail tracking numbers. No schema changes needed.
+
+## Deployment
+>>>>>>> origin/main
 
 ### Add a New Shop
 
